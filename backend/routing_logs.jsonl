@@ -1,0 +1,5 @@
+{"query": "Hello?", "classification": "Simple", "model_used": "llama-3.1-8b-instant", "tokens_input": 310, "tokens_output": 10, "latency_ms": 3437}
+{"query": "I'm a remote employee, can you tell me what all assets will I be provided with?", "classification": "Simple", "model_used": "llama-3.1-8b-instant", "tokens_input": 716, "tokens_output": 53, "latency_ms": 2227}
+{"query": "what about communication expectations?", "classification": "Simple", "model_used": "llama-3.1-8b-instant", "tokens_input": 623, "tokens_output": 170, "latency_ms": 1889}
+{"query": "I mean are there any slack core hours during which I have to be available?", "classification": "Simple", "model_used": "llama-3.1-8b-instant", "tokens_input": 686, "tokens_output": 52, "latency_ms": 1693}
+{"query": "what are the first steps that I should take, when I join?", "classification": "Simple", "model_used": "llama-3.1-8b-instant", "tokens_input": 818, "tokens_output": 109, "latency_ms": 2415}
