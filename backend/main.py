@@ -1,7 +1,9 @@
 from fastapi import FastAPI, HTTPException
+from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 import os
 import time
+import json
 from groq import Groq
 from starlette.middleware.cors import CORSMiddleware
 from dotenv import load_dotenv
@@ -52,12 +54,9 @@ class QueryResponse(BaseModel):
     is_safe: bool
 
 
-@app.post("/chat", response_model=QueryResponse)
+@app.post("/chat")
 def chat(request: QueryRequest):
     start_time = time.time()
-
-    # Check if index is loaded properly.
-    # To demonstrate a retrieval failure, let's keep index loaded.
 
     # 1. Router Selection
     routing_info = route_query(request.query)
@@ -65,7 +64,6 @@ def chat(request: QueryRequest):
     classification = routing_info["classification"]
 
     # 2. Retrieve Documents via RAG
-    # In case there's an error retrieving, we default to empty context.
     retrieved_chunks = []
     context_text = ""
     try:
@@ -86,7 +84,7 @@ def chat(request: QueryRequest):
 
     user_prompt = f"Context:\n{context_text}\n\nUser Question: {request.query}"
 
-    # 4. Call Groq
+    # 4. Call Groq with Stream
     try:
         completion = groq_client.chat.completions.create(
             model=model,
@@ -96,35 +94,51 @@ def chat(request: QueryRequest):
             ],
             temperature=0.0,
             max_tokens=512,
+            stream=True,
         )
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"LLM API Error: {str(e)}")
 
-    response_text = completion.choices[0].message.content
-    usage = completion.usage
-    tokens_input = usage.prompt_tokens
-    tokens_output = usage.completion_tokens
+    def generate():
+        full_text = ""
+        tokens_input = 0
+        tokens_output = 0
 
-    latency_ms = int((time.time() - start_time) * 1000)
+        for chunk in completion:
+            if chunk.choices and len(chunk.choices) > 0:
+                content = chunk.choices[0].delta.content
+                if content:
+                    full_text += content
+                    yield f"data: {json.dumps({'type': 'token', 'text': content})}\n\n"
 
-    # Log Routing Decision
-    log_routing_decision(
-        query=request.query,
-        classification=classification,
-        model_used=model,
-        tokens_input=tokens_input,
-        tokens_output=tokens_output,
-        latency_ms=latency_ms,
-    )
+            if getattr(chunk, "usage", None) is not None:
+                tokens_input = chunk.usage.prompt_tokens
+                tokens_output = chunk.usage.completion_tokens
 
-    # 5. Output Evaluator
-    is_safe, flags = evaluate_response(response_text, context_provided)
+        latency_ms = int((time.time() - start_time) * 1000)
 
-    return {
-        "response": response_text,
-        "model_used": model,
-        "tokens_input": tokens_input,
-        "tokens_output": tokens_output,
-        "evaluator_flags": flags,
-        "is_safe": is_safe,
-    }
+        # Log Routing Decision
+        log_routing_decision(
+            query=request.query,
+            classification=classification,
+            model_used=model,
+            tokens_input=tokens_input,
+            tokens_output=tokens_output,
+            latency_ms=latency_ms,
+        )
+
+        # 5. Output Evaluator (Must wait until end for full stream context)
+        is_safe, flags = evaluate_response(full_text, context_provided)
+
+        meta = {
+            "type": "meta",
+            "model_used": model,
+            "tokens_input": tokens_input,
+            "tokens_output": tokens_output,
+            "evaluator_flags": flags,
+            "is_safe": is_safe,
+        }
+
+        yield f"data: {json.dumps(meta)}\n\n"
+
+    return StreamingResponse(generate(), media_type="text/event-stream")
