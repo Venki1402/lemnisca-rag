@@ -41,6 +41,11 @@ except Exception as e:
     print(f"Failed to load index on startup. {e}")
 
 
+@app.get("/health")
+def health_check():
+    return {"status": "ok"}
+
+
 class QueryRequest(BaseModel):
     query: str
 
