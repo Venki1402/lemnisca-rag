@@ -3,7 +3,7 @@ document.addEventListener("DOMContentLoaded", () => {
   const userInput = document.getElementById("user-input");
   const sendBtn = document.getElementById("send-btn");
   const debugToggle = document.getElementById("toggle-debug");
-  const API_URL = "http://127.0.0.1:8000/chat";
+  const API_URL = "https://lemnisca-rag.onrender.com/chat";
 
   // Remove the initial pre-rendered message to handle rendering via JS logic
   chatBox.innerHTML = "";
